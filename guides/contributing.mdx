@@ -1,0 +1,147 @@
+---
+title: "Contributing"
+description: "How to build, test, and contribute to RaTeX."
+---
+
+Thanks for helping improve RaTeX. Keep changes focused and consistent with surrounding code. This page covers the development workflow — from first build through golden tests to submitting a pull request.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install the Rust toolchain">
+    RaTeX requires Rust 1.70 or later. Install via [rustup](https://rustup.rs):
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    rustup update stable
+    ```
+  </Step>
+  <Step title="Install wasm-pack (web / WASM only)">
+    Required when working under `platforms/web`. Skip if you are not modifying the WASM crate.
+
+    ```bash
+    curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    ```
+  </Step>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/erweixin/RaTeX.git
+    cd RaTeX
+    ```
+  </Step>
+</Steps>
+
+## Build, lint, and test
+
+Run all three from the repository root. CI executes the same commands (`.github/workflows/ci.yml`).
+
+```bash
+cargo build --workspace
+cargo clippy --workspace -- -D warnings
+cargo test --workspace
+```
+
+<Warning>
+  `cargo clippy --workspace -- -D warnings` treats every lint warning as an error. Fix all warnings before opening a pull request.
+</Warning>
+
+## Golden (visual) tests
+
+RaTeX uses pixel-level comparisons against KaTeX reference PNGs to catch rendering regressions. There are two suites: the main math suite and the mhchem (`\ce` / `\pu`) suite.
+
+### Main math suite
+
+Reference PNGs are in `tests/golden/fixtures/`, one per formula in `tests/golden/test_cases.txt`.
+
+Regenerate RaTeX outputs after changing layout or rendering code:
+
+```bash
+./scripts/update_golden_output.sh
+```
+
+This writes rendered PNGs to `tests/golden/output/`. The golden test in `crates/ratex-render/tests/golden_test.rs` compares those outputs against the fixtures using an ink-coverage threshold.
+
+### mhchem suite
+
+Reference PNGs are in `tests/golden/fixtures_ce/`. Generate them from the KaTeX+mhchem Puppeteer script:
+
+```bash
+cd tools/golden_compare && npm install
+node generate_reference.mjs \
+  ../../tests/golden/test_case_ce.txt \
+  ../../tests/golden/fixtures_ce \
+  --mhchem
+```
+
+Run the ink-score test against the mhchem suite:
+
+```bash
+cargo test -p ratex-render golden_mhchem_pass_rate -- --nocapture
+```
+
+Regenerate RaTeX mhchem renders (written to `tests/golden/output_ce/`):
+
+```bash
+./scripts/update_golden_output.sh
+```
+
+Compare them against the KaTeX references:
+
+```bash
+python3 tools/golden_compare/compare_golden.py --ce
+```
+
+<Note>
+  After editing `tests/golden/test_cases.txt` or `tests/golden/test_case_ce.txt`, always regenerate both KaTeX references and RaTeX outputs so indices stay aligned.
+</Note>
+
+## Regenerating font data (advanced)
+
+KaTeX-derived font metrics and symbol tables in `crates/ratex-font/src/data/` are generated files. Only rerun the generators when intentionally updating the KaTeX baseline data.
+
+<AccordionGroup>
+  <Accordion title="Regenerate font metrics">
+    ```bash
+    python3 tools/convert_metrics.py
+    ```
+    This reads `fontMetricsData.js` from a KaTeX installation and writes `crates/ratex-font/src/data/metrics_data.rs`.
+  </Accordion>
+  <Accordion title="Regenerate symbol tables">
+    ```bash
+    python3 tools/convert_symbols.py
+    ```
+    This reads `symbols.js` from a KaTeX installation and writes `crates/ratex-font/src/data/symbols_data.rs`.
+  </Accordion>
+  <Accordion title="Regenerate mhchem state machine data">
+    ```bash
+    node tools/generate_mhchem_data.mjs
+    ```
+    Exports `machines.json` and `patterns_regex.json` into `crates/ratex-parser/src/data/` from the bundled mhchem reference implementation in `tools/mhchem_reference.js`.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Do not edit files in `crates/ratex-font/src/data/` by hand. They are overwritten by the generator scripts.
+</Warning>
+
+## Pull request guidelines
+
+- **One logical change per PR** when possible. Separate refactors from behavior changes.
+- If you change a public API or observable behavior, update the relevant `README.md` or file in `docs/`.
+- For version bumps and release steps, follow `RELEASING.md` at the repository root.
+- CI must pass (build + clippy + test) before a PR can be merged.
+
+## Project layout
+
+See the [architecture page](/architecture) for a full directory tree and crate dependency graph.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="LaTeX syntax" icon="square-root-variable" href="/guides/latex-syntax">
+    Reference for what LaTeX commands RaTeX supports.
+  </Card>
+  <Card title="Chemistry notation" icon="flask" href="/guides/chemistry">
+    How `\ce` and `\pu` work, including the mhchem golden test workflow.
+  </Card>
+</CardGroup>

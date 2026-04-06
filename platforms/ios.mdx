@@ -1,0 +1,183 @@
+---
+title: "iOS"
+description: "Render LaTeX math natively on iOS using Swift and CoreGraphics — no WebView, no JavaScript."
+---
+
+## How it works
+
+RaTeX on iOS follows a three-stage pipeline:
+
+```
+LaTeX string
+    ↓ ratex_parse_and_layout() [C ABI, static lib]
+JSON DisplayList
+    ↓ RaTeXEngine.parse()       [Swift JSON decode]
+DisplayList
+    ↓ RaTeXRenderer.draw()      [CoreGraphics]
+UIView / SwiftUI View
+```
+
+The Rust library exports a C ABI (`ratex_parse_and_layout`) that returns a JSON DisplayList. Swift decodes that JSON into a `DisplayList` value, and `RaTeXRenderer` walks it to draw glyphs and paths via CoreGraphics — entirely on-process, no network required.
+
+## Prerequisites
+
+| Tool | Version |
+|------|---------|
+| Xcode | 15+ |
+| Rust | 1.75+ (`rustup`) |
+| iOS target | 14+ |
+
+Install the required Rust targets once:
+
+```bash
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+```
+
+## Installation
+
+<Steps>
+  <Step title="Add the package dependency">
+    <Tabs>
+      <Tab title="Swift Package Manager (recommended)">
+        In Xcode: **File → Add Package Dependencies**, enter `https://github.com/erweixin/RaTeX`, and select the `RaTeX` product.
+
+        For local development, first build the XCFramework:
+
+        ```bash
+        bash platforms/ios/build-ios.sh
+        ```
+
+        Then in Xcode: **File → Add Package Dependencies → Add Local…** and point to the repo root.
+      </Tab>
+      <Tab title="Manual">
+        1. Run the build script to produce the XCFramework:
+
+        ```bash
+        bash platforms/ios/build-ios.sh
+        # → platforms/ios/RaTeX.xcframework
+        ```
+
+        2. Drag `platforms/ios/RaTeX.xcframework` into your Xcode project.
+        3. In **Build Phases → Link Binary With Libraries**, confirm it is listed.
+        4. Copy the Swift sources from `platforms/ios/Sources/RaTeX/*.swift` into your project.
+        5. Add the `Fonts` folder from `platforms/ios/Sources/Ratex/Fonts/` to your target's **Copy Bundle Resources**.
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="(Optional) Preload fonts at startup">
+    Fonts load automatically on first render. To preload them eagerly, call this in your `AppDelegate` or `@main` entry point:
+
+    ```swift
+    RaTeXFontLoader.loadFromPackageBundle()
+    ```
+
+    For manual integration, use `RaTeXFontLoader.loadFromBundle()` instead.
+  </Step>
+</Steps>
+
+## Usage
+
+<Tabs>
+  <Tab title="UIKit">
+    Use `RaTeXView` like any `UIView`. It sizes itself to the rendered formula automatically.
+
+    ```swift
+    import RaTeX
+
+    let mathView = RaTeXView()
+    mathView.latex    = #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#
+    mathView.fontSize = 28
+    mathView.onError  = { print("RaTeX error:", $0) }
+
+    // Auto-sizing
+    mathView.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(mathView)
+    NSLayoutConstraint.activate([
+        mathView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+        mathView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+    ])
+    ```
+  </Tab>
+  <Tab title="SwiftUI — block">
+    Use `RaTeXFormula` directly in any SwiftUI view hierarchy:
+
+    ```swift
+    import RaTeX
+
+    struct ContentView: View {
+        var body: some View {
+            RaTeXFormula(
+                latex: #"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}"#,
+                fontSize: 24
+            )
+            .padding()
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="SwiftUI — inline">
+    For mixed text and LaTeX, use a `FlowLayout` (a SwiftUI `Layout`) that places `Text` and `RaTeXFormula` children side-by-side with automatic line wrapping. Baseline alignment uses the library-provided `RaTeXFormulaAscentKey` layout value.
+
+    ```swift
+    import RaTeX
+
+    struct InlineExample: View {
+        private let fs: CGFloat = 17
+
+        var body: some View {
+            FlowLayout(horizontalSpacing: 3, lineSpacing: 6) {
+                Text("由勾股定理")
+                RaTeXFormula(latex: #"a^2 + b^2 = c^2"#, fontSize: fs, onError: { _ in })
+                Text("可直接求得斜边长度。")
+            }
+        }
+    }
+
+    // FlowLayout: wrap children horizontally, align baselines.
+    // Reads RaTeXFormulaAscentKey for formula baseline; falls back to
+    // firstTextBaseline for Text views.
+    struct FlowLayout: Layout {
+        var horizontalSpacing: CGFloat = 4
+        var lineSpacing: CGFloat = 6
+
+        // ... see demo/ios for the full implementation
+    }
+    ```
+
+    `RaTeXFormulaAscentKey` is a `LayoutValueKey<CGFloat>` built into the library. It carries the formula's ascent (distance from baseline to top) so that `FlowLayout` can align mixed children without manual offset calculation.
+  </Tab>
+  <Tab title="Low-level">
+    Use `RaTeXEngine` and `RaTeXRenderer` directly when you need to draw into an arbitrary `CGContext` — for example, inside a `UIView.draw(_:)` override or a custom PDF renderer:
+
+    ```swift
+    import RaTeX
+
+    let displayList = try RaTeXEngine.shared.parse(#"\sum_{n=1}^\infty \frac{1}{n^2}"#)
+    let renderer    = RaTeXRenderer(displayList: displayList, fontSize: 20)
+
+    // In your UIView.draw(_:) or CGContext block:
+    renderer.draw(in: UIGraphicsGetCurrentContext()!)
+    ```
+  </Tab>
+</Tabs>
+
+## Coordinate system
+
+All `DisplayList` coordinates are in **em units**. `RaTeXRenderer` multiplies them by `fontSize` (pt) to produce screen coordinates.
+
+| Axis | Direction |
+|------|-----------|
+| X | Increases rightward from the left edge |
+| Y | Increases downward from the top edge |
+| Baseline | At Y = `height × fontSize` |
+
+## File map
+
+| File | Purpose |
+|------|---------|
+| `build-ios.sh` | Build script → `RaTeX.xcframework` |
+| `Package.swift` | Swift Package manifest |
+| `Sources/RaTeX/DisplayList.swift` | Codable Swift mirror of Rust types |
+| `Sources/RaTeX/RaTeXEngine.swift` | Calls C ABI, decodes JSON |
+| `Sources/RaTeX/RaTeXRenderer.swift` | CoreGraphics drawing loop |
+| `Sources/RaTeX/RaTeXView.swift` | UIKit `UIView` + SwiftUI `View` |

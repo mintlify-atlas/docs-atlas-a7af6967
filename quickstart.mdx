@@ -1,80 +1,221 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Render your first LaTeX formula in under five minutes. Choose your platform below.
 ---
 
-## Get started in three steps
+<Info>
+  RaTeX requires Rust 1.70+ for the server-side renderer. Native platform packages (npm, Swift, Gradle, pub.dev) have no Rust prerequisite for consumers.
+</Info>
 
-Get your documentation site running locally and make your first customization.
+<Tabs>
+  <Tab title="Web (WASM)">
+    The fastest way to get started. Install the npm package and drop a web component into any HTML page.
 
-### Step 1: Set up your local environment
+    <Steps>
+      <Step title="Install the package">
+        ```bash
+        npm install ratex-wasm
+        ```
+      </Step>
+      <Step title="Add fonts and the web component script">
+        ```html
+        <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+        <script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
+        ```
+      </Step>
+      <Step title="Render a formula">
+        Use the `<ratex-formula>` custom element anywhere in your HTML:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+        ```html
+        <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48"></ratex-formula>
+        <ratex-formula latex="\ce{CO2 + H2O <=> H2CO3}" font-size="32"></ratex-formula>
+        ```
+      </Step>
+    </Steps>
 
-### Step 2: Deploy your changes
+    <Tip>
+      See `platforms/web/README.md` in the repository for Canvas 2D usage and bundler configuration.
+    </Tip>
+  </Tab>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+  <Tab title="iOS">
+    Integrate RaTeX into a SwiftUI app using Swift Package Manager.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    <Steps>
+      <Step title="Add the package dependency">
+        In Xcode, go to **File → Add Package Dependencies** and enter:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+        ```
+        https://github.com/erweixin/RaTeX
+        ```
+      </Step>
+      <Step title="Import and render">
+        ```swift
+        import RaTeX
 
-### Step 3: Go live
+        struct ContentView: View {
+            var body: some View {
+                RaTeXFormula(
+                    latex: #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#,
+                    fontSize: 24
+                )
+            }
+        }
+        ```
+      </Step>
+    </Steps>
+  </Tab>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Tab title="Android">
+    Add RaTeX to an Android project via Gradle.
+
+    <Steps>
+      <Step title="Add the dependency">
+        In your module's `build.gradle.kts`:
+
+        ```kotlin
+        implementation("io.github.erweixin:ratex-android:0.0.15")
+        ```
+      </Step>
+      <Step title="Add the view to your layout">
+        ```xml
+        <io.github.erweixin.ratex.MathView
+            android:id="@+id/mathView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        ```
+      </Step>
+      <Step title="Set the formula from Kotlin">
+        ```kotlin
+        binding.mathView.latex = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
+        binding.mathView.fontSize = 24f
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Flutter">
+    Add RaTeX to a Flutter project via pub.dev.
+
+    <Steps>
+      <Step title="Add the dependency">
+        In `pubspec.yaml`:
+
+        ```yaml
+        dependencies:
+          ratex_flutter: ^0.0.15
+        ```
+
+        Then run:
+
+        ```bash
+        flutter pub get
+        ```
+      </Step>
+      <Step title="Use the widget">
+        ```dart
+        import 'package:ratex_flutter/ratex_flutter.dart';
+
+        class MyWidget extends StatelessWidget {
+          @override
+          Widget build(BuildContext context) {
+            return RaTeXWidget(
+              latex: r'\frac{-b \pm \sqrt{b^2-4ac}}{2a}',
+              fontSize: 28,
+            );
+          }
+        }
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="React Native">
+    Add RaTeX to a React Native project via npm.
+
+    <Steps>
+      <Step title="Install the package">
+        ```bash
+        npm install ratex-react-native
+        ```
+      </Step>
+      <Step title="Link native modules">
+        For React Native 0.60+ autolinking handles this automatically. For older versions, run:
+
+        ```bash
+        npx react-native link ratex-react-native
+        ```
+      </Step>
+      <Step title="Render a formula">
+        ```tsx
+        import { RaTeXView } from 'ratex-react-native';
+
+        export default function App() {
+          return (
+            <RaTeXView
+              latex="\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"
+              fontSize={24}
+            />
+          );
+        }
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Server (PNG)">
+    Render formulas to PNG on the server or in CI using the `ratex-render` binary.
+
+    <Steps>
+      <Step title="Clone and build">
+        ```bash
+        git clone https://github.com/erweixin/RaTeX.git
+        cd RaTeX
+        cargo build --release
+        ```
+      </Step>
+      <Step title="Render a formula to PNG">
+        Pipe a LaTeX string to `ratex-render` via stdin:
+
+        ```bash
+        echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-render
+        ```
+
+        Chemistry notation works the same way:
+
+        ```bash
+        echo '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | cargo run --release -p ratex-render
+        ```
+      </Step>
+      <Step title="Render to SVG (optional)">
+        To produce a standalone SVG with embedded glyph outlines (no external fonts required):
+
+        ```bash
+        echo '\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}' | \
+          cargo run --release -p ratex-svg --features cli -- \
+          --font-dir /path/to/katex/fonts --output-dir ./out
+        ```
+      </Step>
+      <Step title="Run the test suite">
+        ```bash
+        cargo test --all
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      The `standalone` SVG feature reads KaTeX TTF files and embeds glyph outlines directly into the SVG output, producing a fully self-contained file that renders correctly without any CSS or web fonts.
+    </Note>
+  </Tab>
+</Tabs>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    Understand the full pipeline from LaTeX string to DisplayList and how each crate fits together.
+  </Card>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Learn what RaTeX is, why it was built, and how it compares to KaTeX and MathJax.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

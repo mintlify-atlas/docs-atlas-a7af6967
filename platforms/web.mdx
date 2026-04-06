@@ -1,0 +1,141 @@
+---
+title: "Web"
+description: "Use RaTeX in the browser via WebAssembly — Rust compiled to WASM for parsing, TypeScript for Canvas 2D rendering."
+---
+
+<Info>
+  For production web projects, we recommend using [KaTeX](https://katex.org/) directly. It is the mature, optimized choice for browser math rendering. This WASM build is **not intended as the best solution** for production web — it exists primarily for **cross-platform comparison and testing**, running the same RaTeX engine as iOS and Android through a different render path.
+</Info>
+
+## Architecture
+
+- **ratex-wasm** (`crates/ratex-wasm`): Rust compiled to WASM. Exports `renderLatex(latex: string) => string`, returning a DisplayList JSON string.
+- **web-render** (`src/renderer.ts`): Renders the DisplayList to Canvas 2D. `GlyphPath` items are drawn via Canvas `fillText` using `char_code` and the loaded KaTeX font.
+- **Entry** (`src/index.ts`): Initializes WASM and exposes `renderLatexToCanvas(latex, canvas, options)` for one-step rendering.
+
+## Installation
+
+```bash
+npm install ratex-wasm
+```
+
+## Usage
+
+<Tabs>
+  <Tab title="Web Component">
+    `<ratex-formula>` is a drop-in custom element — no bundler required. It works with any framework or plain HTML.
+
+    ```html
+    <!-- 1. Fonts (once; the component also attempts auto-injection) -->
+    <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+
+    <!-- 2. Register the custom element -->
+    <script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
+
+    <!-- 3. Use it -->
+    <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48" padding="16"></ratex-formula>
+    <ratex-formula latex="x^2 + y^2 = z^2"></ratex-formula>
+    ```
+
+    Supported attributes:
+
+    | Attribute | Description |
+    |-----------|-------------|
+    | `latex` | LaTeX math-mode string to render |
+    | `font-size` | Font size in px |
+    | `padding` | Padding around the formula in px |
+    | `background-color` | Canvas background color |
+
+    You can also set `element.latex = '...'` via JavaScript after the element is registered.
+
+    **In React:** React 18+ renders custom elements correctly. Use a `ref` to set `el.latex = '...'` programmatically (preferred over `dangerouslySetInnerHTML`):
+
+    ```tsx
+    import { useEffect, useRef } from 'react';
+
+    export function MathFormula({ latex }: { latex: string }) {
+      const ref = useRef<HTMLElement>(null);
+      useEffect(() => {
+        if (ref.current) (ref.current as any).latex = latex;
+      }, [latex]);
+      return <ratex-formula ref={ref} font-size="32" />;
+    }
+    ```
+
+    **In Vue:** Vue 3 treats non-Vue tags as custom elements by default. To configure explicitly:
+
+    ```ts
+    app.config.compilerOptions.isCustomElement = (tag) => tag === 'ratex-formula'
+    ```
+
+    This is optional in Vue 3.2+.
+  </Tab>
+  <Tab title="Programmatic API">
+    Use `initRatex` and `renderLatexToCanvas` for full control over the canvas:
+
+    ```ts
+    import { initRatex, renderLatexToCanvas } from './index.js';
+
+    await initRatex();
+    const canvas = document.querySelector('canvas');
+    renderLatexToCanvas('\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', canvas, {
+      fontSize: 48,
+      padding: 16,
+      backgroundColor: 'white',
+    });
+    ```
+
+    The page must load a math font or letters and numbers will display as boxes. Load the bundled fonts using the stylesheet:
+
+    ```html
+    <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+    ```
+
+    Or via an ESM import in your bundler:
+
+    ```ts
+    import 'ratex-wasm/fonts.css';
+    ```
+  </Tab>
+  <Tab title="DisplayList JSON only">
+    Use `renderLatex` when you only need the raw DisplayList JSON — for example, to render with your own pipeline or to inspect the output:
+
+    ```ts
+    import { initRatex, renderLatex } from './index.js';
+
+    await initRatex();
+    const json = renderLatex('x^2 + y^2 = z^2');
+    const displayList = JSON.parse(json);
+    ```
+
+    The DisplayList schema matches the C ABI output from `ratex_parse_and_layout`. See the [C ABI header](https://github.com/erweixin/RaTeX/blob/main/crates/ratex-ffi/include/ratex.h) for the full JSON structure.
+  </Tab>
+</Tabs>
+
+## Font setup
+
+Fonts are bundled with the npm package. Load `fonts.css` once per page — either as a `<link>` tag or as a bundler import:
+
+```html
+<link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+```
+
+```ts
+import 'ratex-wasm/fonts.css';
+```
+
+The `<ratex-formula>` web component attempts to auto-inject `fonts.css` if it detects the fonts are not yet loaded, but loading it explicitly is more reliable.
+
+## Build from source
+
+**Prerequisites:** the [Rust toolchain](https://rustup.rs/) and [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/).
+
+```bash
+cd platforms/web
+npm install          # installs katex devDependency for font copy
+npm run build        # copy-fonts → build:wasm (generates pkg/) → build:ts
+```
+
+Output:
+- `pkg/` — compiled WASM and JS bindings
+- `fonts/` — KaTeX woff2/woff files referenced by `fonts.css`

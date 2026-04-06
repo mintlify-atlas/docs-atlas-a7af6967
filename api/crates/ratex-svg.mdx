@@ -1,0 +1,189 @@
+---
+title: "ratex-svg"
+description: "SVG export: render a DisplayList to an SVG string."
+---
+
+`ratex-svg` converts a [`DisplayList`](/api/crates/ratex-types#displaylist) into an SVG document string. Coordinates follow the same em-unit convention as `ratex-render`: scaled by `SvgOptions::font_size` with `SvgOptions::padding` added on all sides.
+
+By default, glyphs are emitted as `<text>` elements using KaTeX CSS `font-family` names (`KaTeX_Main`, `KaTeX_Math`, …). Enable the `standalone` feature to embed glyph outlines as `<path>` elements instead, producing self-contained SVGs with no external font dependency.
+
+```toml Cargo.toml
+[dependencies]
+ratex-svg = "0.0.15"
+
+# For self-contained SVGs with embedded glyph outlines:
+ratex-svg = { version = "0.0.15", features = ["standalone"] }
+```
+
+---
+
+## `render_to_svg`
+
+Render a display list to a standalone SVG document string.
+
+```rust
+pub fn render_to_svg(list: &DisplayList, opts: &SvgOptions) -> String
+```
+
+<ParamField path="param.list" type="&DisplayList" required>
+  The display list to render. Produced by `ratex_layout::to_display_list()`.
+</ParamField>
+
+<ParamField path="param.opts" type="&SvgOptions" required>
+  SVG render configuration. Use `SvgOptions::default()` for standard output.
+</ParamField>
+
+**Returns:** A complete SVG document string beginning with `<svg …>` and ending with `</svg>`.
+
+```rust
+use ratex_parser::parse;
+use ratex_layout::{layout, to_display_list, LayoutOptions};
+use ratex_svg::{render_to_svg, SvgOptions};
+
+let ast = parse("\\frac{1}{2}").unwrap();
+let layout_box = layout(&ast, &LayoutOptions::default());
+let display_list = to_display_list(&layout_box);
+
+let svg = render_to_svg(&display_list, &SvgOptions::default());
+std::fs::write("formula.svg", svg.as_bytes()).unwrap();
+```
+
+---
+
+## `SvgOptions`
+
+```rust
+#[derive(Debug, Clone)]
+pub struct SvgOptions {
+    pub font_size: f64,
+    pub padding: f64,
+    pub stroke_width: f64,
+    pub embed_glyphs: bool,
+    pub font_dir: String,
+}
+```
+
+<ResponseField name="font_size" type="f64" default="40.0">
+  User units per em. Matches `ratex_render::RenderOptions::font_size` at DPR 1. Controls the overall scale of the SVG output.
+</ResponseField>
+
+<ResponseField name="padding" type="f64" default="10.0">
+  Padding added to all sides of the SVG viewport, in the same user units.
+</ResponseField>
+
+<ResponseField name="stroke_width" type="f64" default="1.5">
+  Stroke width in user units for unfilled `DisplayItem::Path` items (e.g. stroked arrows).
+</ResponseField>
+
+<ResponseField name="embed_glyphs" type="bool" default="false">
+  When `true` and the `standalone` feature is enabled, glyphs are drawn as filled `<path>` outlines loaded from KaTeX TTF files in `font_dir`. When `false` (or `standalone` is not enabled), a `<text>` element with the appropriate KaTeX CSS `font-family` is emitted instead.
+</ResponseField>
+
+<ResponseField name="font_dir" type="String" default='""'>
+  Directory containing KaTeX `.ttf` files. Required when `embed_glyphs` is `true`. Same path convention as `ratex_render::RenderOptions::font_dir`.
+</ResponseField>
+
+---
+
+## Feature flags
+
+<AccordionGroup>
+  <Accordion title="standalone">
+    Enables glyph outline embedding. When `embed_glyphs: true` and a valid `font_dir` is provided, `GlyphPath` items are rendered as `<path d="…" fill-rule="evenodd">` elements using glyph outlines extracted from KaTeX TTF files via `ab_glyph`.
+
+    This produces completely self-contained SVGs with no external font dependency — suitable for print, PDF export, or embedding in contexts without KaTeX CSS.
+
+    ```toml
+    ratex-svg = { version = "0.0.15", features = ["standalone"] }
+    ```
+
+    ```rust
+    use ratex_svg::{render_to_svg, SvgOptions};
+
+    let svg = render_to_svg(&display_list, &SvgOptions {
+        font_size: 40.0,
+        padding: 10.0,
+        stroke_width: 1.5,
+        embed_glyphs: true,
+        font_dir: "path/to/katex/fonts".to_string(),
+    });
+    ```
+  </Accordion>
+  <Accordion title="cli">
+    Enables the `render-svg` binary. Implies `standalone` and pulls in `ratex-layout` and `ratex-parser`.
+
+    ```toml
+    ratex-svg = { version = "0.0.15", features = ["cli"] }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## CLI binary (`render-svg`)
+
+When built with the `cli` feature, `ratex-svg` exposes a `render-svg` binary that reads LaTeX expressions from stdin and writes numbered SVG files to an output directory.
+
+### Building
+
+```bash
+cargo build --release -p ratex-svg --features cli
+```
+
+### Usage
+
+```bash
+echo "\int_0^\infty e^{-x^2} dx" | ./target/release/render-svg \
+  --font-dir path/to/katex/fonts \
+  --output-dir output_svg/ \
+  --font-size 40 \
+  --dpr 1.0
+```
+
+Lines beginning with `#` and blank lines are ignored.
+
+### CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--font-dir <path>` | auto-detected | Directory containing KaTeX `.ttf` files. |
+| `--output-dir <path>` | `output_svg` | Output directory. Created if absent. |
+| `--font-size <f64>` | `40.0` | User units per em at DPR 1. |
+| `--dpr <f32>` | `1.0` | Device pixel ratio. Scales `font_size` and `padding`. |
+
+### Output
+
+Each formula is written as `<output-dir>/<NNNN>.svg`. Errors are printed to stderr.
+
+```
+OK     1 \int_0^\infty e^{-x^2} dx
+ERR    2 \badinput — Parse error: …
+
+Wrote 1 SVG(s) to output_svg/
+```
+
+---
+
+## SVG output structure
+
+Each `DisplayItem` maps to an SVG element:
+
+| `DisplayItem` variant | SVG element |
+|-----------------------|-------------|
+| `GlyphPath` (default) | `<text … font-family="KaTeX_Math" …>` |
+| `GlyphPath` (`embed_glyphs=true`) | `<path d="…" fill-rule="evenodd" …>` |
+| `Line` | `<rect …>` (height = `thickness × em`) |
+| `Rect` | `<rect …>` |
+| `Path` (filled) | `<path fill="…" fill-rule="nonzero" …>` |
+| `Path` (stroked) | `<path fill="none" stroke="…" stroke-linecap="round" …>` |
+
+The SVG `viewBox` and `width`/`height` attributes are set to:
+
+```
+width  = display_list.width  × font_size  +  2 × padding
+height = (display_list.height + display_list.depth) × font_size  +  2 × padding
+```
+
+<Note>
+  When using `<text>` elements (default mode), the host page must load KaTeX CSS fonts for correct glyph shapes. Include `<link rel="stylesheet" href="katex/dist/katex.min.css">` or equivalent.
+</Note>

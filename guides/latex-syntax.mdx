@@ -1,0 +1,193 @@
+---
+title: "LaTeX syntax"
+description: "What LaTeX syntax RaTeX supports — ~99% KaTeX compatibility."
+---
+
+RaTeX implements ~99% of [KaTeX](https://katex.org/) syntax in pure Rust. The input is always a raw math-mode string — no surrounding `$`, `$$`, or `\[…\]` delimiters.
+
+<Note>
+  Pass the inner content only. For example, pass `\frac{1}{2}` not `$\frac{1}{2}$` or `\[\frac{1}{2}\]`.
+</Note>
+
+For a complete, formula-by-formula compatibility breakdown, see the **[live support table](https://erweixin.github.io/RaTeX/demo/support-table.html)**.
+
+## Basic math
+
+Fractions, roots, subscripts, and superscripts work as in KaTeX.
+
+```latex
+\frac{-b \pm \sqrt{b^2-4ac}}{2a}
+```
+
+```latex
+x^2 + y^2 = z^2
+```
+
+```latex
+\sqrt[3]{x^3 + y^3}
+```
+
+```latex
+a_n = a_{n-1} + a_{n-2}
+```
+
+## Sums, products, and integrals
+
+Limit placement follows display-style conventions automatically.
+
+```latex
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+```
+
+```latex
+\prod_{k=1}^{n} k = n!
+```
+
+```latex
+\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}
+```
+
+```latex
+\iint_D f(x,y)\,dx\,dy
+```
+
+## Matrices
+
+Use the standard AMS matrix environments inside `\begin{...}...\end{...}`.
+
+<CodeGroup>
+
+```latex pmatrix (parentheses)
+\begin{pmatrix} a & b \\ c & d \end{pmatrix}
+```
+
+```latex bmatrix (brackets)
+\begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}
+```
+
+```latex vmatrix (pipes — determinant)
+\begin{vmatrix} a & b \\ c & d \end{vmatrix}
+```
+
+</CodeGroup>
+
+## Multi-line environments
+
+<Warning>
+  Only the **starred (unnumbered)** variants are fully supported. Numbered equation environments (`equation`, `gather`, `align`, …) are not yet implemented — automatic numbering and tag placement are on the roadmap.
+</Warning>
+
+```latex align*
+\begin{align*}
+  f(x) &= x^2 + 2x + 1 \\
+       &= (x + 1)^2
+\end{align*}
+```
+
+```latex gather*
+\begin{gather*}
+  a + b = c \\
+  d + e = f
+\end{gather*}
+```
+
+```latex equation*
+\begin{equation*}
+  E = mc^2
+\end{equation*}
+```
+
+## Greek letters and common symbols
+
+<AccordionGroup>
+  <Accordion title="Greek letters">
+
+| Command | Output | Command | Output |
+|---|---|---|---|
+| `\alpha` | α | `\Alpha` | Α |
+| `\beta` | β | `\Beta` | Β |
+| `\gamma` | γ | `\Gamma` | Γ |
+| `\delta` | δ | `\Delta` | Δ |
+| `\epsilon` | ε | `\varepsilon` | ε |
+| `\theta` | θ | `\Theta` | Θ |
+| `\lambda` | λ | `\Lambda` | Λ |
+| `\mu` | μ | `\pi` | π |
+| `\sigma` | σ | `\Sigma` | Σ |
+| `\omega` | ω | `\Omega` | Ω |
+
+  </Accordion>
+  <Accordion title="Common symbols">
+
+| Command | Description |
+|---|---|
+| `\infty` | Infinity |
+| `\partial` | Partial derivative |
+| `\nabla` | Nabla / del |
+| `\pm`, `\mp` | Plus-minus, minus-plus |
+| `\times`, `\div` | Multiplication, division |
+| `\leq`, `\geq` | Less/greater than or equal |
+| `\neq`, `\approx` | Not equal, approximately equal |
+| `\in`, `\notin` | Element of, not element of |
+| `\subset`, `\subseteq` | Subset relations |
+| `\cup`, `\cap` | Union, intersection |
+
+  </Accordion>
+</AccordionGroup>
+
+## Text in math
+
+Use these commands to switch font or mode inside a formula.
+
+| Command | Purpose | Example |
+|---|---|---|
+| `\text{...}` | Roman text at current size | `\text{for all } n > 0` |
+| `\mathrm{...}` | Upright roman math letters | `\mathrm{d}x` |
+| `\mathbf{...}` | Bold math | `\mathbf{v} \cdot \mathbf{w}` |
+| `\mathit{...}` | Italic math | `\mathit{slope}` |
+| `\mathbb{...}` | Blackboard bold | `\mathbb{R}`, `\mathbb{Z}` |
+| `\mathcal{...}` | Calligraphic | `\mathcal{F}` |
+
+## Stretchy delimiters
+
+Prefix delimiters with `\left` and `\right` to make them scale automatically to the enclosed content.
+
+```latex
+\left( \frac{a}{b} \right)
+```
+
+```latex
+\left\lvert \frac{x - \mu}{\sigma} \right\rvert
+```
+
+```latex
+\left\{ \sum_{k=1}^{n} a_k \right\}
+```
+
+```latex
+\left\lfloor x \right\rfloor \quad \left\lceil x \right\rceil
+```
+
+## Colors
+
+Apply color to any part of a formula with `\textcolor`.
+
+```latex
+\textcolor{red}{x} + \textcolor{blue}{y} = \textcolor{green}{z}
+```
+
+```latex
+\textcolor{#FF6600}{E} = mc^2
+```
+
+Named colors (`red`, `blue`, `green`, `black`, `white`, `gray`, `yellow`, `orange`, `purple`) and hex values are both accepted.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Chemistry notation" icon="flask" href="/guides/chemistry">
+    Use `\ce` and `\pu` for chemical equations and physics units.
+  </Card>
+  <Card title="DisplayList format" icon="list" href="/guides/display-list">
+    See how parsed formulas become drawing commands.
+  </Card>
+</CardGroup>

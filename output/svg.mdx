@@ -1,0 +1,119 @@
+---
+title: "SVG export"
+description: "Render LaTeX formulas to self-contained SVG files using ratex-svg."
+---
+
+`ratex-svg` converts a `DisplayList` produced by the RaTeX layout engine into an SVG string. It ships in two modes: a lightweight default mode that uses `<text>` elements, and a standalone mode that embeds glyph outlines directly into the file so no external fonts are needed.
+
+## Modes
+
+<CardGroup cols={2}>
+  <Card title="Default mode" icon="font">
+    Glyphs are emitted as `<text>` elements referencing KaTeX font families. The output is small and fast to generate, but correct display requires the KaTeX web fonts to be loaded by the viewer.
+  </Card>
+  <Card title="Standalone mode" icon="file-vector">
+    Glyph outlines are read from KaTeX TTF files at render time and embedded as `<path>` elements. The resulting SVG renders correctly in any viewer with no CSS, no fonts, and no network requests.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Use standalone mode when you need a fully portable SVG — for example, in print pipelines, embedded assets, or environments where you cannot guarantee font loading.
+</Tip>
+
+## CLI usage
+
+Build and run the `render-svg` binary (requires the `cli` feature, which implies `standalone`):
+
+<CodeGroup>
+
+```bash Default mode
+echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-svg --features cli
+```
+
+```bash Standalone mode
+echo '\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}' | \
+  cargo run --release -p ratex-svg --features cli -- \
+  --font-dir /path/to/katex/fonts --output-dir ./out
+```
+
+</CodeGroup>
+
+Output files are written to `./out/` (default: `output/`) and named sequentially — `0001.svg`, `0002.svg`, and so on.
+
+<Note>
+  Standalone mode reads KaTeX TTF files from `--font-dir` at startup. Point this at the `dist/fonts/` directory of any KaTeX npm installation, for example `tools/lexer_compare/node_modules/katex/dist/fonts`.
+</Note>
+
+## Feature flags
+
+| Feature | Description |
+|---|---|
+| `standalone` | Embeds glyph outlines as `<path>` elements using `ab_glyph`. Requires KaTeX TTF files at render time. Produces self-contained SVGs with no external font dependency. |
+| `cli` | Enables the `render-svg` binary. Implies `standalone` and also pulls in `ratex-layout` and `ratex-parser`. |
+
+Add them to your `Cargo.toml` dependency as needed:
+
+```toml Cargo.toml
+ratex-svg = { version = "0.0.15", features = ["standalone"] }
+```
+
+## SvgOptions
+
+`SvgOptions` controls the rendering parameters. All fields have sensible defaults.
+
+<ResponseField name="font_size" type="f64" default="40.0">
+  Base font size in em units. Scales the entire output proportionally.
+</ResponseField>
+
+<ResponseField name="padding" type="f64" default="10.0">
+  Padding added around the formula bounding box on all sides, in the same units as `font_size`.
+</ResponseField>
+
+<ResponseField name="stroke_width" type="f64" default="1.5">
+  Stroke width used for stroked `<path>` elements (e.g. unfilled arrows).
+</ResponseField>
+
+<ResponseField name="embed_glyphs" type="bool" default="false">
+  When `true` and the `standalone` feature is enabled, glyph outlines are embedded as `<path>` elements instead of `<text>` elements.
+</ResponseField>
+
+<ResponseField name="font_dir" type="String" default='""'>
+  Path to the directory containing KaTeX `.ttf` files. Required when `embed_glyphs` is `true`. Leave empty for default (text) mode.
+</ResponseField>
+
+## Library usage
+
+Call `render_to_svg` directly from Rust after building a `DisplayList`:
+
+```rust
+use ratex_svg::{render_to_svg, SvgOptions};
+use ratex_layout::{layout, to_display_list, LayoutOptions};
+use ratex_parser::parse;
+
+let ast = parse(r"\frac{-b \pm \sqrt{b^2-4ac}}{2a}").unwrap();
+let layout_box = layout(&ast, &LayoutOptions::default());
+let display_list = to_display_list(&layout_box);
+
+// Default: glyphs as <text>
+let svg = render_to_svg(&display_list, &SvgOptions::default());
+
+// Standalone: embed glyph outlines
+let svg_standalone = render_to_svg(&display_list, &SvgOptions {
+    embed_glyphs: true,
+    font_dir: "/path/to/katex/fonts".to_string(),
+    ..Default::default()
+});
+
+std::fs::write("formula.svg", svg.as_bytes()).unwrap();
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="PNG export" icon="image" href="/output/png">
+    Rasterize formulas to PNG on the server using tiny-skia.
+  </Card>
+  <Card title="DisplayList format" icon="list" href="/guides/display-list">
+    Understand the drawing command format that feeds every renderer.
+  </Card>
+</CardGroup>

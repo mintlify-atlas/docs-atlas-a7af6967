@@ -1,0 +1,281 @@
+---
+title: "WASM API Reference"
+description: "The ratex-wasm JavaScript/TypeScript API for browser environments."
+---
+
+The `ratex-wasm` npm package wraps the RaTeX WASM module with a TypeScript API for browser environments. It exposes functions for parsing LaTeX to a `DisplayList`, rendering to a `<canvas>`, and a ready-made `<ratex-formula>` Web Component.
+
+<Note>
+  For most browser use cases, the `<ratex-formula>` Web Component is the simplest integration — it requires no JavaScript. Use the programmatic API only when you need direct access to the `DisplayList` or custom rendering.
+</Note>
+
+## Installation
+
+```bash
+npm install ratex-wasm
+```
+
+---
+
+## Initialization
+
+### `initRatex`
+
+Initialize the WASM module. Must be called once before any other function. Safe to call concurrently — subsequent calls share the same in-flight promise so WASM is loaded at most once.
+
+```typescript
+function initRatex(
+  init?: () => Promise<{ renderLatex: (s: string) => string }>
+): Promise<void>
+```
+
+<ParamField path="param.init" type="() => Promise<{ renderLatex: (s: string) => string }>">
+  Optional custom loader. If omitted, the default WASM package is loaded via dynamic import. Provide this to control loading in bundler environments that require explicit asset imports.
+</ParamField>
+
+**Returns:** `Promise<void>` — resolves when WASM is ready.
+
+```typescript
+import { initRatex } from "ratex-wasm";
+
+await initRatex();
+```
+
+---
+
+## Core rendering
+
+### `renderLatex`
+
+Parse LaTeX and return the `DisplayList` as a JSON string. Throws if WASM is not initialized or the LaTeX is invalid.
+
+```typescript
+function renderLatex(latex: string): string
+```
+
+<ParamField path="param.latex" type="string" required>
+  LaTeX expression to render (without surrounding `$` delimiters).
+</ParamField>
+
+**Returns:** `string` — JSON-serialized `DisplayList`.
+
+```typescript
+import { initRatex, renderLatex } from "ratex-wasm";
+
+await initRatex();
+const json = renderLatex("\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}");
+const displayList = JSON.parse(json);
+console.log(displayList.width, displayList.height);
+```
+
+---
+
+### `renderLatexToDisplayList`
+
+Parse LaTeX and return a parsed `DisplayList` object. Throws if WASM is not initialized, the LaTeX is invalid, or the output is not valid JSON.
+
+```typescript
+function renderLatexToDisplayList(latex: string): DisplayList
+```
+
+<ParamField path="param.latex" type="string" required>
+  LaTeX expression to render.
+</ParamField>
+
+**Returns:** `DisplayList` — parsed display list object.
+
+---
+
+### `renderLatexToCanvas`
+
+Parse LaTeX and draw the result onto a canvas element. Resizes the canvas to fit. Returns the `DisplayList` used for rendering.
+
+```typescript
+function renderLatexToCanvas(
+  latex: string,
+  canvas: HTMLCanvasElement,
+  options?: WebRenderOptions
+): DisplayList
+```
+
+<ParamField path="param.latex" type="string" required>
+  LaTeX expression to render.
+</ParamField>
+
+<ParamField path="param.canvas" type="HTMLCanvasElement" required>
+  The canvas element to draw onto. Its dimensions are set automatically to fit the formula.
+</ParamField>
+
+<ParamField path="param.options" type="WebRenderOptions">
+  Optional render configuration. See [`WebRenderOptions`](#webrenderoptions) below.
+</ParamField>
+
+**Returns:** `DisplayList` — the display list that was rendered.
+
+```typescript
+import { initRatex, renderLatexToCanvas } from "ratex-wasm";
+
+await initRatex();
+
+const canvas = document.getElementById("my-canvas") as HTMLCanvasElement;
+renderLatexToCanvas("\\int_0^\\infty e^{-x^2} dx", canvas, {
+  fontSize: 48,
+  padding: 12,
+  backgroundColor: "transparent",
+});
+```
+
+---
+
+## Types
+
+### `WebRenderOptions`
+
+```typescript
+interface WebRenderOptions {
+  /** Font size in pixels (1 em). Default: 40. */
+  fontSize?: number;
+  /** Padding on all sides in pixels. Default: 10. */
+  padding?: number;
+  /** CSS fill style for the background. Default: "white". */
+  backgroundColor?: string;
+  /** CSS font-family for math glyphs. Defaults to KaTeX fonts when loaded. */
+  mathFontFamily?: string;
+}
+```
+
+<ResponseField name="fontSize" type="number" default="40">
+  Size of one em in pixels. Controls the overall scale of the rendered formula.
+</ResponseField>
+
+<ResponseField name="padding" type="number" default="10">
+  Padding added to all sides of the canvas in pixels.
+</ResponseField>
+
+<ResponseField name="backgroundColor" type="string" default="white">
+  CSS fill style applied to the canvas background before drawing the formula. Use `"transparent"` to preserve the page background.
+</ResponseField>
+
+<ResponseField name="mathFontFamily" type="string" default='KaTeX_Main, "Latin Modern Math", "Cambria Math", serif'>
+  CSS `font-family` string used for glyph rendering. The page must load the KaTeX fonts (via `fonts.css`) for correct output.
+</ResponseField>
+
+### `DisplayList`
+
+```typescript
+interface DisplayList {
+  items: DisplayItem[];
+  width: number;   // em units
+  height: number;  // ascent above baseline, em units
+  depth: number;   // descent below baseline, em units
+}
+```
+
+### `DisplayItem`
+
+```typescript
+type DisplayItem =
+  | { type: "GlyphPath"; x: number; y: number; scale: number;
+      font: string; char_code: number; color: Color }
+  | { type: "Line"; x: number; y: number; width: number;
+      thickness: number; color: Color }
+  | { type: "Rect"; x: number; y: number; width: number;
+      height: number; color: Color }
+  | { type: "Path"; x: number; y: number; commands: PathCommand[];
+      fill: boolean; color: Color };
+```
+
+### `Color`
+
+```typescript
+interface Color {
+  r: number;  // 0–1
+  g: number;  // 0–1
+  b: number;  // 0–1
+  a: number;  // 0–1
+}
+```
+
+### `PathCommand`
+
+```typescript
+type PathCommand =
+  | { type: "MoveTo"; x: number; y: number }
+  | { type: "LineTo"; x: number; y: number }
+  | { type: "CubicTo"; x1: number; y1: number; x2: number; y2: number; x: number; y: number }
+  | { type: "QuadTo"; x1: number; y1: number; x: number; y: number }
+  | { type: "Close" };
+```
+
+---
+
+## `<ratex-formula>` Web Component
+
+The `<ratex-formula>` custom element is the easiest way to embed math in any HTML page or framework. It initializes WASM automatically and re-renders whenever its attributes change.
+
+### Setup
+
+```html
+<!-- 1. Load KaTeX fonts -->
+<link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+
+<!-- 2. Register the component -->
+<script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
+
+<!-- 3. Use it -->
+<ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}"></ratex-formula>
+```
+
+<Tip>
+  If `fonts.css` is not imported manually, the component will attempt to auto-inject it relative to the module URL. To guarantee correct font loading, include the `<link>` explicitly.
+</Tip>
+
+### Attributes
+
+<ResponseField name="latex" type="string" required>
+  The LaTeX expression to render. Updated dynamically — changing this attribute triggers a re-render.
+</ResponseField>
+
+<ResponseField name="font-size" type="number" default="48">
+  Font size in pixels (1 em). Controls the scale of the rendered formula.
+</ResponseField>
+
+<ResponseField name="padding" type="number" default="16">
+  Padding in pixels added to all sides of the canvas.
+</ResponseField>
+
+<ResponseField name="background-color" type="string" default="white">
+  CSS fill style for the canvas background.
+</ResponseField>
+
+### DOM property
+
+The `latex` attribute is also exposed as a DOM property:
+
+```javascript
+const el = document.querySelector("ratex-formula");
+el.latex = "E = mc^2";
+```
+
+### Framework examples
+
+<Tabs>
+  <Tab title="HTML">
+    ```html
+    <ratex-formula latex="\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}"></ratex-formula>
+    ```
+  </Tab>
+  <Tab title="React">
+    ```tsx
+    // React treats unknown attributes as DOM attributes when lowercase
+    export function Formula({ latex }: { latex: string }) {
+      return <ratex-formula latex={latex} font-size="48" />;
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```html
+    <ratex-formula :latex="formula" font-size="48"></ratex-formula>
+    ```
+  </Tab>
+</Tabs>

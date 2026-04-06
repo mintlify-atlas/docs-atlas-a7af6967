@@ -1,0 +1,106 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "RaTeX",
+  "projectDescription": "A KaTeX-compatible LaTeX math rendering engine written in pure Rust, with native bindings for iOS, Android, Flutter, React Native, Web (WASM), and server-side PNG/SVG output.",
+  "theme": "luma",
+  "primaryColor": "#6B46C1",
+  "lightColor": "#EDE9FE",
+  "darkColor": "#3B1F7A",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Platform Guides",
+            "pages": [
+              "platforms/ios",
+              "platforms/android",
+              "platforms/flutter",
+              "platforms/react-native",
+              "platforms/web"
+            ]
+          },
+          {
+            "group": "Output Formats",
+            "pages": [
+              "output/png",
+              "output/svg"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/latex-syntax",
+              "guides/chemistry",
+              "guides/display-list",
+              "guides/contributing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "C ABI (Native)",
+            "pages": [
+              "api/c-abi"
+            ]
+          },
+          {
+            "group": "WASM (Web)",
+            "pages": [
+              "api/wasm"
+            ]
+          },
+          {
+            "group": "Rust Crates",
+            "pages": [
+              "api/crates/ratex-types",
+              "api/crates/ratex-layout",
+              "api/crates/ratex-render",
+              "api/crates/ratex-svg"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Pure Rust LaTeX math rendering engine with ~99% KaTeX syntax coverage",
+    "No JavaScript, no WebView, no DOM — fully native on every platform",
+    "One Rust core → iOS, Android, Flutter, React Native, Web (WASM), PNG, SVG",
+    "Full mhchem support for chemistry notation via \\ce and \\pu",
+    "C ABI for native platforms + WASM for browser environments",
+    "Server-side PNG rasterization via tiny-skia",
+    "Self-contained SVG export with embedded glyph outlines",
+    "Thread-safe, predictable memory, offline-capable"
+  ],
+  "publicApiSurface": [
+    "ratex_parse_and_layout(latex: *const c_char) -> *mut c_char  [C ABI]",
+    "ratex_free_display_list(json: *mut c_char)  [C ABI]",
+    "ratex_get_last_error() -> *const c_char  [C ABI]",
+    "renderLatex(latex: string) -> string  [WASM]",
+    "renderLatexToCanvas(latex, canvas, options)  [WASM / TypeScript]",
+    "initRatex() -> Promise<void>  [WASM]",
+    "<ratex-formula> Web Component (latex, font-size, padding, background-color attributes)",
+    "RaTeXView (iOS UIKit / Android XML / React Native / Flutter widget)",
+    "RaTeXFormula (iOS SwiftUI)",
+    "RaTeXWidget (Flutter)",
+    "RaTeXEngine.shared.parse() (iOS), RaTeXEngine.parse() (Android), RaTeXEngine.instance.parseAndLayout() (Flutter)",
+    "RaTeXRenderer.draw() (iOS/Android)",
+    "RaTeXSpan.create() (Android inline)",
+    "InlineTeX component (React Native)",
+    "DisplayList, DisplayItem, Color, MathStyle, PathCommand (Rust types)",
+    "render_to_svg(list, opts: SvgOptions) -> String  [ratex-svg]"
+  ]
+}

@@ -1,0 +1,145 @@
+---
+title: "React Native"
+description: "Render LaTeX math natively in React Native on iOS and Android — no WebView, no JavaScript math engine."
+---
+
+Formulas are parsed and laid out in Rust (compiled to a native library) and drawn directly onto a native Canvas using KaTeX fonts.
+
+## Features
+
+- Renders LaTeX math natively on iOS and Android
+- Supports both the **New Architecture** (Fabric / JSI) and the **Old Architecture** (Bridge)
+- Measures rendered content size for scroll and dynamic layout
+- Error callback for parse failures
+- Bundles all required KaTeX fonts — no extra setup
+- `InlineTeX` component for mixed text and `$...$` formula strings
+
+## Requirements
+
+| Dependency | Version |
+|-----------|---------|
+| React Native | ≥ 0.73 |
+| React | ≥ 18 |
+| iOS | ≥ 14.0 |
+| Android | minSdk 21 (Android 5.0+) |
+
+## Installation
+
+<Steps>
+  <Step title="Install the npm package">
+    ```bash
+    npm install ratex-react-native
+    ```
+  </Step>
+  <Step title="iOS — run pod install">
+    ```bash
+    cd ios && pod install
+    ```
+  </Step>
+  <Step title="Android">
+    No additional steps required. The native `.so` libraries are bundled automatically.
+  </Step>
+</Steps>
+
+## Usage
+
+<Tabs>
+  <Tab title="Block formula">
+    Use `RaTeXView` to render a standalone block formula:
+
+    ```tsx
+    import { RaTeXView } from 'ratex-react-native';
+
+    function MathFormula() {
+      return (
+        <RaTeXView
+          latex="\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"
+          fontSize={24}
+          onError={(e) => console.warn('LaTeX error:', e.nativeEvent.error)}
+        />
+      );
+    }
+    ```
+  </Tab>
+  <Tab title="Inline formula">
+    Use `InlineTeX` to render a mixed string of plain text and `$...$` LaTeX formulas:
+
+    ```tsx
+    import { InlineTeX } from 'ratex-react-native';
+
+    function Paragraph() {
+      return (
+        <InlineTeX
+          content="The energy–mass relation $E = mc^2$ is a consequence of special relativity."
+          fontSize={16}
+          textStyle={{ color: '#333' }}
+        />
+      );
+    }
+    ```
+
+    Use `$...$` delimiters anywhere in the `content` string. Multiple formulas per string are supported.
+  </Tab>
+</Tabs>
+
+## API reference
+
+### `<RaTeXView />`
+
+<ParamField path="latex" type="string" required>
+  LaTeX math-mode string to render. Do not include surrounding `$` or `\[…\]` delimiters.
+</ParamField>
+
+<ParamField path="fontSize" type="number" default="24">
+  Font size in **dp** (density-independent pixels). The rendered formula scales proportionally.
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Standard React Native style. Width and height are automatically set from measured content unless overridden.
+</ParamField>
+
+<ParamField path="onError" type="(e: { nativeEvent: { error: string } }) => void">
+  Called when the LaTeX string fails to parse.
+</ParamField>
+
+<ParamField path="onContentSizeChange" type="(e: { nativeEvent: { width: number; height: number } }) => void">
+  Called after layout with the formula's rendered dimensions in dp. Useful for scroll views or dynamic containers.
+</ParamField>
+
+#### Content size auto-sizing
+
+`RaTeXView` automatically applies the measured `width` and `height` from `onContentSizeChange` to its own style. You can use it inside a `ScrollView` without specifying explicit dimensions:
+
+```tsx
+<ScrollView horizontal>
+  <RaTeXView latex="\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}" fontSize={28} />
+</ScrollView>
+```
+
+### `<InlineTeX />`
+
+Renders a mixed string of plain text and `$...$` LaTeX as a single inline flow. Text and formula segments are laid out in a flex row with `alignItems: 'center'`, so the formula centerline aligns with the surrounding text automatically.
+
+**Rendering pipeline:**
+1. Each formula is rendered off-screen (absolutely positioned, `opacity: 0`) to measure its intrinsic dimensions via `onContentSizeChange`.
+2. Once all formulas are measured, the visible flex row is rendered with each formula at its exact measured size.
+
+<ParamField path="content" type="string" required>
+  Text string with `$...$` markers for inline LaTeX. Multiple formulas per string are supported.
+</ParamField>
+
+<ParamField path="fontSize" type="number" default="16">
+  Font size in dp passed to each formula renderer.
+</ParamField>
+
+<ParamField path="textStyle" type="StyleProp<TextStyle>">
+  Style applied to plain-text segments.
+</ParamField>
+
+## Architecture support
+
+Supports both the **New Architecture** (Fabric / Codegen) and the **Old Architecture** (Bridge) — no configuration needed. React Native ≥ 0.73 with `newArchEnabled=true` uses Fabric automatically; older projects fall back to the Bridge manager.
+
+## Font size note
+
+`fontSize` is interpreted as **dp (density-independent pixels)**, not CSS `pt` or raw pixels. On a 3× density screen, `fontSize={24}` renders at 72 physical pixels tall — matching React Native's standard layout unit.

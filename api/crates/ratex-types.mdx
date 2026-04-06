@@ -1,0 +1,386 @@
+---
+title: "ratex-types"
+description: "Core shared types: DisplayList, DisplayItem, Color, MathStyle, PathCommand."
+---
+
+`ratex-types` is the base crate shared by every other crate in the workspace. It defines the data structures that flow from the layout engine to platform renderers.
+
+```toml Cargo.toml
+[dependencies]
+ratex-types = "0.0.15"
+```
+
+**Public exports:**
+
+```rust
+pub use color::Color;
+pub use display_item::{DisplayItem, DisplayList};
+pub use math_style::MathStyle;
+pub use path_command::PathCommand;
+```
+
+---
+
+## `DisplayList`
+
+The final output of the layout engine: a flat list of drawing commands with absolute coordinates, ready for platform renderers.
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisplayList {
+    pub items: Vec<DisplayItem>,
+    pub width: f64,
+    pub height: f64,
+    pub depth: f64,
+}
+```
+
+<ResponseField name="items" type="Vec<DisplayItem>" required>
+  Ordered list of drawing commands to execute from first to last.
+</ResponseField>
+
+<ResponseField name="width" type="f64" required>
+  Total horizontal extent of the formula in em units.
+</ResponseField>
+
+<ResponseField name="height" type="f64" required>
+  Ascent above the baseline in em units.
+</ResponseField>
+
+<ResponseField name="depth" type="f64" required>
+  Descent below the baseline in em units. The total rendered height is `height + depth`.
+</ResponseField>
+
+**Methods:**
+
+```rust
+impl DisplayList {
+    pub fn new() -> Self
+    pub fn total_height(&self) -> f64  // height + depth
+}
+```
+
+---
+
+## `DisplayItem`
+
+A single drawing instruction with an absolute position. All coordinate fields are in em units.
+
+```rust
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum DisplayItem {
+    GlyphPath { x, y, scale, font, char_code, commands, color },
+    Line      { x, y, width, thickness, color, dashed },
+    Rect      { x, y, width, height, color },
+    Path      { x, y, commands, fill, color },
+}
+```
+
+<AccordionGroup>
+  <Accordion title="GlyphPath — draw a glyph at position">
+    Render a single glyph character from a KaTeX font face.
+
+    ```rust
+    DisplayItem::GlyphPath {
+        x: f64,
+        y: f64,
+        scale: f64,
+        font: String,
+        char_code: u32,
+        #[serde(skip_serializing, default)]
+        commands: Vec<PathCommand>,
+        color: Color,
+    }
+    ```
+
+    <ResponseField name="x" type="f64">
+      Horizontal position of the glyph origin in em units.
+    </ResponseField>
+    <ResponseField name="y" type="f64">
+      Vertical position of the glyph baseline in em units (Y increases downward).
+    </ResponseField>
+    <ResponseField name="scale" type="f64">
+      Scale factor relative to the base em size. Multiply by `font_size` to get the effective pixel size.
+    </ResponseField>
+    <ResponseField name="font" type="String">
+      KaTeX font face identifier, e.g. `"Math-Italic"`, `"Main-Regular"`, `"AMS-Regular"`. See the font table below.
+    </ResponseField>
+    <ResponseField name="char_code" type="u32">
+      Unicode code point of the character to render.
+    </ResponseField>
+    <ResponseField name="commands" type="Vec<PathCommand>">
+      Placeholder bounding-box paths from layout. Not used by any renderer — all platforms draw glyphs via `font` + `char_code`. Skipped during JSON serialization to reduce payload size.
+    </ResponseField>
+    <ResponseField name="color" type="Color">
+      Fill color for the glyph.
+    </ResponseField>
+
+    **KaTeX font face identifiers:**
+
+    | `font` string | Family | Style | Weight |
+    |---------------|--------|-------|--------|
+    | `Main-Regular` | KaTeX_Main | normal | normal |
+    | `Main-Bold` | KaTeX_Main | normal | bold |
+    | `Main-Italic` | KaTeX_Main | italic | normal |
+    | `Main-BoldItalic` | KaTeX_Main | italic | bold |
+    | `Math-Italic` | KaTeX_Math | italic | normal |
+    | `Math-BoldItalic` | KaTeX_Math | italic | bold |
+    | `AMS-Regular` | KaTeX_AMS | normal | normal |
+    | `Caligraphic-Regular` | KaTeX_Caligraphic | normal | normal |
+    | `Fraktur-Regular` | KaTeX_Fraktur | normal | normal |
+    | `Fraktur-Bold` | KaTeX_Fraktur | normal | bold |
+    | `SansSerif-Regular` | KaTeX_SansSerif | normal | normal |
+    | `SansSerif-Bold` | KaTeX_SansSerif | normal | bold |
+    | `SansSerif-Italic` | KaTeX_SansSerif | italic | normal |
+    | `Script-Regular` | KaTeX_Script | normal | normal |
+    | `Typewriter-Regular` | KaTeX_Typewriter | normal | normal |
+    | `Size1-Regular` … `Size4-Regular` | KaTeX_Size1…4 | normal | normal |
+  </Accordion>
+
+  <Accordion title="Line — draw a horizontal rule">
+    Render a horizontal line. Used for fraction bars, overlines, underlines, and `\hdashline`.
+
+    ```rust
+    DisplayItem::Line {
+        x: f64,
+        y: f64,
+        width: f64,
+        thickness: f64,
+        color: Color,
+        #[serde(default)]
+        dashed: bool,
+    }
+    ```
+
+    <ResponseField name="x" type="f64">
+      Left edge of the line in em units.
+    </ResponseField>
+    <ResponseField name="y" type="f64">
+      Vertical center of the line in em units.
+    </ResponseField>
+    <ResponseField name="width" type="f64">
+      Horizontal length of the line in em units.
+    </ResponseField>
+    <ResponseField name="thickness" type="f64">
+      Line thickness in em units.
+    </ResponseField>
+    <ResponseField name="color" type="Color">
+      Line color.
+    </ResponseField>
+    <ResponseField name="dashed" type="bool" default="false">
+      When `true`, render as a dashed line (used for `\hdashline`).
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Rect — draw a filled rectangle">
+    Render a solid filled rectangle. Used for `\colorbox` backgrounds and `\rule`.
+
+    ```rust
+    DisplayItem::Rect {
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        color: Color,
+    }
+    ```
+
+    <ResponseField name="x" type="f64">
+      Left edge of the rectangle in em units.
+    </ResponseField>
+    <ResponseField name="y" type="f64">
+      Top edge of the rectangle in em units.
+    </ResponseField>
+    <ResponseField name="width" type="f64">
+      Width of the rectangle in em units.
+    </ResponseField>
+    <ResponseField name="height" type="f64">
+      Height of the rectangle in em units.
+    </ResponseField>
+    <ResponseField name="color" type="Color">
+      Fill color.
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Path — draw an arbitrary SVG-style path">
+    Render an arbitrary vector path. Used for radical signs, large delimiters, arrows, and braces.
+
+    ```rust
+    DisplayItem::Path {
+        x: f64,
+        y: f64,
+        commands: Vec<PathCommand>,
+        fill: bool,
+        color: Color,
+    }
+    ```
+
+    <ResponseField name="x" type="f64">
+      Path origin X offset in em units. Added to all command coordinates.
+    </ResponseField>
+    <ResponseField name="y" type="f64">
+      Path origin Y offset in em units. Added to all command coordinates.
+    </ResponseField>
+    <ResponseField name="commands" type="Vec<PathCommand>">
+      Sequence of SVG-style path commands. See [`PathCommand`](#pathcommand).
+    </ResponseField>
+    <ResponseField name="fill" type="bool">
+      When `true`, fill the path. When `false`, stroke it.
+    </ResponseField>
+    <ResponseField name="color" type="Color">
+      Fill or stroke color.
+    </ResponseField>
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## `PathCommand`
+
+SVG-style path commands used within `DisplayItem::Path`. (The `commands` field also exists on `GlyphPath` but is skipped during JSON serialization and not used by any renderer — platforms draw glyphs via `font` + `char_code` instead.)
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum PathCommand {
+    MoveTo { x: f64, y: f64 },
+    LineTo { x: f64, y: f64 },
+    CubicTo { x1: f64, y1: f64, x2: f64, y2: f64, x: f64, y: f64 },
+    QuadTo  { x1: f64, y1: f64, x: f64, y: f64 },
+    Close,
+}
+```
+
+<AccordionGroup>
+  <Accordion title="MoveTo">
+    Begin a new subpath at `(x, y)`.
+
+    <ResponseField name="x" type="f64">X coordinate in em units.</ResponseField>
+    <ResponseField name="y" type="f64">Y coordinate in em units.</ResponseField>
+  </Accordion>
+  <Accordion title="LineTo">
+    Draw a straight line from the current point to `(x, y)`.
+
+    <ResponseField name="x" type="f64">X coordinate in em units.</ResponseField>
+    <ResponseField name="y" type="f64">Y coordinate in em units.</ResponseField>
+  </Accordion>
+  <Accordion title="CubicTo">
+    Draw a cubic Bézier curve to `(x, y)` with control points `(x1, y1)` and `(x2, y2)`.
+
+    <ResponseField name="x1" type="f64">First control point X.</ResponseField>
+    <ResponseField name="y1" type="f64">First control point Y.</ResponseField>
+    <ResponseField name="x2" type="f64">Second control point X.</ResponseField>
+    <ResponseField name="y2" type="f64">Second control point Y.</ResponseField>
+    <ResponseField name="x" type="f64">End point X.</ResponseField>
+    <ResponseField name="y" type="f64">End point Y.</ResponseField>
+  </Accordion>
+  <Accordion title="QuadTo">
+    Draw a quadratic Bézier curve to `(x, y)` with control point `(x1, y1)`.
+
+    <ResponseField name="x1" type="f64">Control point X.</ResponseField>
+    <ResponseField name="y1" type="f64">Control point Y.</ResponseField>
+    <ResponseField name="x" type="f64">End point X.</ResponseField>
+    <ResponseField name="y" type="f64">End point Y.</ResponseField>
+  </Accordion>
+  <Accordion title="Close">
+    Close the current subpath by drawing a line back to the most recent `MoveTo` point. No fields.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## `Color`
+
+An RGBA color with all channels in the range `[0.0, 1.0]`.
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Color {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+```
+
+<ResponseField name="r" type="f32">
+  Red channel. `0.0` = no red, `1.0` = full red.
+</ResponseField>
+<ResponseField name="g" type="f32">
+  Green channel. `0.0` = no green, `1.0` = full green.
+</ResponseField>
+<ResponseField name="b" type="f32">
+  Blue channel. `0.0` = no blue, `1.0` = full blue.
+</ResponseField>
+<ResponseField name="a" type="f32">
+  Alpha channel. `0.0` = fully transparent, `1.0` = fully opaque.
+</ResponseField>
+
+**Constants and constructors:**
+
+```rust
+Color::BLACK          // r:0, g:0, b:0, a:1 (default)
+Color::WHITE          // r:1, g:1, b:1, a:1
+Color::new(r, g, b, a)
+Color::rgb(r, g, b)   // alpha = 1.0
+Color::from_hex("#ff0000")           // 3- or 6-digit hex
+Color::from_name("red")              // CSS named colors
+Color::from_model("RGB", "178,34,34") // MathJax color model
+Color::parse("[RGB]178,34,34")       // unified parser
+```
+
+**Supported named colors:** `red`, `green`, `lime`, `blue`, `maroon`, `navy`, `olive`, `silver`, `white`, `black`, `orange`, `yellow`, `purple`, `aqua`/`cyan`, `fuchsia`/`magenta`, `gray`/`grey`, `brown`, `pink`, `teal`.
+
+**MathJax color models:** `RGB` (integers 0–255), `rgb` (floats 0–1), `HTML` (hex RRGGBB), `gray` (float 0–1), `cmyk` (floats 0–1).
+
+---
+
+## `MathStyle`
+
+TeX math styles that control the size and positioning of sub-expressions. Mirrors KaTeX's `Style.ts` lookup tables.
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum MathStyle {
+    #[default]
+    Display,
+    DisplayCramped,
+    Text,
+    TextCramped,
+    Script,
+    ScriptCramped,
+    ScriptScript,
+    ScriptScriptCramped,
+}
+```
+
+<AccordionGroup>
+  <Accordion title="Variants">
+    | Variant | Description | Size multiplier |
+    |---------|-------------|----------------|
+    | `Display` _(default)_ | Top-level display math | 1.0× |
+    | `DisplayCramped` | Display with lowered superscripts | 1.0× |
+    | `Text` | Inline math | 1.0× |
+    | `TextCramped` | Inline math with lowered superscripts | 1.0× |
+    | `Script` | Superscript / subscript size | 0.7× |
+    | `ScriptCramped` | Script with lowered superscripts | 0.7× |
+    | `ScriptScript` | Nested super/subscript size | 0.5× |
+    | `ScriptScriptCramped` | ScriptScript with lowered superscripts | 0.5× |
+  </Accordion>
+  <Accordion title="Methods">
+    ```rust
+    style.numerator()     -> MathStyle  // style for fraction numerator
+    style.denominator()   -> MathStyle  // style for fraction denominator (always cramped)
+    style.superscript()   -> MathStyle  // style for superscripts
+    style.subscript()     -> MathStyle  // style for subscripts (always cramped)
+    style.cramped()       -> MathStyle  // cramped variant of this style
+    style.text()          -> MathStyle  // text-size equivalent (Script → Text)
+    style.is_display()    -> bool
+    style.is_cramped()    -> bool
+    style.is_tight()      -> bool       // Script or ScriptScript
+    style.size_index()    -> usize      // 0=text, 1=script, 2=scriptscript
+    style.size_multiplier() -> f64      // 1.0, 0.7, or 0.5
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,140 @@
+---
+title: "Chemistry notation"
+description: "Using \\ce and \\pu for chemistry and physics unit notation in RaTeX."
+---
+
+RaTeX includes a complete Rust port of the [mhchem](https://mhchem.github.io/MathJax-mhchem/) state machine, giving you full `\ce` and `\pu` support as part of the standard rendering pipeline — no plugins or configuration required.
+
+## Using \ce
+
+The `\ce` command renders chemical equations. Pass the chemical expression as the argument:
+
+```latex
+\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}
+```
+
+```latex
+\ce{Fe^{2+} + 2e- -> Fe}
+```
+
+```latex
+\ce{CO2 + H2O <=> H2CO3}
+```
+
+Catalysts and conditions go in square brackets above and below the arrow:
+
+```latex
+\ce{N2 + 3H2 ->[\text{Fe}][\Delta] 2NH3}
+```
+
+### Arrow types
+
+| Syntax | Meaning |
+|---|---|
+| `->` | Forward reaction |
+| `<-` | Reverse reaction |
+| `<->` | Equilibrium (double-headed) |
+| `<=>` | Resonance / equilibrium |
+| `<-->` | Mesomeric arrow |
+| `->>` | Double arrow (two-step) |
+
+### Charges
+
+Write ionic charges with the standard superscript notation:
+
+```latex
+\ce{Ca^{2+} + 2Cl^- -> CaCl2}
+```
+
+```latex
+\ce{MnO4^- + 8H+ + 5e- -> Mn^{2+} + 4H2O}
+```
+
+### State symbols
+
+Append state symbols in parentheses:
+
+```latex
+\ce{NaCl(aq) + AgNO3(aq) -> AgCl(s) + NaNO3(aq)}
+```
+
+| Symbol | State |
+|---|---|
+| `(s)` | Solid |
+| `(l)` | Liquid |
+| `(g)` | Gas |
+| `(aq)` | Aqueous solution |
+
+### Isotopes
+
+Write mass number as a leading superscript and atomic number as a leading subscript:
+
+```latex
+\ce{^{235}_{92}U + n -> ^{141}_{56}Ba + ^{92}_{36}Kr + 3n}
+```
+
+## Using \pu
+
+The `\pu` command formats physical quantities following IUPAC conventions. Units are automatically typeset in upright roman type, and the value is separated from the unit.
+
+```latex
+\pu{1.5e-3 mol//L}
+```
+
+```latex
+\pu{9.81 m/s^2}
+```
+
+```latex
+\pu{273.15 K}
+```
+
+```latex
+\pu{6.022e23 mol-1}
+```
+
+<Tip>
+  Use `//` for a fraction with a solidus (e.g., `mol//L` → mol/L). Use `/` to separate numerator and denominator units in a fraction that is typeset vertically.
+</Tip>
+
+## Using chemistry notation on any platform
+
+Pass `\ce{...}` or `\pu{...}` exactly like any other LaTeX string — no special mode or flag is required.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    echo '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | cargo run --release -p ratex-render
+    ```
+  </Tab>
+  <Tab title="Web component">
+    ```html
+    <ratex-formula latex="\ce{CO2 + H2O <=> H2CO3}" font-size="32"></ratex-formula>
+    ```
+  </Tab>
+  <Tab title="C ABI (iOS / Android / Flutter)">
+    ```c
+    const char* json = ratex_parse_and_layout("\\ce{Fe^{2+} + 2e- -> Fe}");
+    ```
+  </Tab>
+  <Tab title="Rust library">
+    ```rust
+    let ast = ratex_parser::parser::parse(r"\ce{H2O + CO2 <=> H2CO3}").unwrap();
+    ```
+  </Tab>
+</Tabs>
+
+## Implementation note
+
+The `\ce` and `\pu` parsers in `crates/ratex-parser` are a direct Rust port of the mhchem state machine originally written for KaTeX. The state transition tables and pattern data are generated from `tools/generate_mhchem_data.mjs` and stored as JSON in `crates/ratex-parser/src/data/`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="LaTeX syntax" icon="square-root-variable" href="/guides/latex-syntax">
+    Full reference for math syntax supported by RaTeX.
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/guides/contributing">
+    How to run the mhchem golden test suite and submit improvements.
+  </Card>
+</CardGroup>

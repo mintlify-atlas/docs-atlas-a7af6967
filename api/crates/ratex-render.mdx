@@ -1,0 +1,169 @@
+---
+title: "ratex-render"
+description: "Server-side PNG rasterizer using tiny-skia."
+---
+
+`ratex-render` converts a [`DisplayList`](/api/crates/ratex-types#displaylist) into a PNG image using [tiny-skia](https://github.com/RazrFalcon/tiny-skia) for rasterization and [ab_glyph](https://github.com/alexheretic/ab_glyph) for glyph rendering from KaTeX TTF files. It is used for server-side rendering, CI golden tests, and batch exports.
+
+<Note>
+  `ratex-render` requires KaTeX `.ttf` font files at runtime. Point `RenderOptions::font_dir` at a directory containing the KaTeX font tree (e.g. `node_modules/katex/dist/fonts`).
+</Note>
+
+---
+
+## As a library
+
+Add `ratex-render` to your `Cargo.toml`:
+
+```toml Cargo.toml
+[dependencies]
+ratex-render = "0.0.15"
+```
+
+**Public exports:**
+
+```rust
+pub use renderer::{render_to_png, RenderOptions};
+```
+
+### `render_to_png`
+
+Rasterize a `DisplayList` to PNG bytes.
+
+```rust
+pub fn render_to_png(
+    display_list: &DisplayList,
+    options: &RenderOptions,
+) -> Result<Vec<u8>, String>
+```
+
+<ParamField path="param.display_list" type="&DisplayList" required>
+  The display list to render. Produced by `ratex_layout::to_display_list()`.
+</ParamField>
+
+<ParamField path="param.options" type="&RenderOptions" required>
+  Render configuration (font size, padding, font directory, DPR).
+</ParamField>
+
+**Returns:** `Ok(Vec<u8>)` containing a valid PNG file on success, or `Err(String)` with an error message on failure (e.g. no fonts found, pixmap allocation failure).
+
+```rust
+use ratex_parser::parse;
+use ratex_layout::{layout, to_display_list, LayoutOptions};
+use ratex_render::{render_to_png, RenderOptions};
+
+let ast = parse("E = mc^2").unwrap();
+let layout_box = layout(&ast, &LayoutOptions::default());
+let display_list = to_display_list(&layout_box);
+
+let options = RenderOptions {
+    font_size: 40.0,
+    padding: 10.0,
+    font_dir: "path/to/katex/fonts".to_string(),
+    device_pixel_ratio: 2.0,
+};
+
+let png_bytes = render_to_png(&display_list, &options).unwrap();
+std::fs::write("output.png", &png_bytes).unwrap();
+```
+
+---
+
+### `RenderOptions`
+
+```rust
+pub struct RenderOptions {
+    pub font_size: f32,
+    pub padding: f32,
+    pub font_dir: String,
+    pub device_pixel_ratio: f32,
+}
+```
+
+<ResponseField name="font_size" type="f32" default="40.0">
+  Pixels per em at DPR 1. Controls the base scale of the rendered formula. The effective pixel size of one em is `font_size × device_pixel_ratio`.
+</ResponseField>
+
+<ResponseField name="padding" type="f32" default="10.0">
+  Padding added to all sides of the output image, in the same units as a pixel at DPR 1. Scaled by `device_pixel_ratio`.
+</ResponseField>
+
+<ResponseField name="font_dir" type="String" default='""'>
+  Path to a directory containing KaTeX `*.ttf` files. Missing font files are skipped and that face falls back to `KaTeX_Main-Regular`. An empty or invalid directory returns an error from `render_to_png`.
+</ResponseField>
+
+<ResponseField name="device_pixel_ratio" type="f32" default="1.0">
+  Multiplier for the output resolution. Set to `2.0` to produce a 2× high-DPI PNG that matches Puppeteer screenshots taken with `deviceScaleFactor: 2`. Clamped to `[0.01, 16.0]`.
+</ResponseField>
+
+---
+
+## As a CLI binary
+
+`ratex-render` ships a `ratex-render` binary that reads LaTeX expressions from stdin (one per line) and writes numbered PNG files to an output directory.
+
+### Building
+
+```bash
+cargo build --release -p ratex-render
+```
+
+### Usage
+
+```bash
+echo "\frac{1}{2}" | ./target/release/ratex-render \
+  --font-dir path/to/katex/fonts \
+  --output-dir output/ \
+  --font-size 40 \
+  --dpr 1.0
+```
+
+Lines beginning with `#` and blank lines are ignored.
+
+### CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--font-dir <path>` | auto-detected | Directory containing KaTeX `.ttf` files. |
+| `--output-dir <path>` | `output` | Directory for output PNG files. Created if absent. |
+| `--font-size <f32>` | `40.0` | Pixels per em at DPR 1. |
+| `--dpr <f32>` | `1.0` | Device pixel ratio. |
+
+### Output
+
+Each successful formula is written as `<output-dir>/<NNNN>.png` (4-digit zero-padded index). Errors are printed to stderr and do not stop the batch. A summary line is printed at the end:
+
+```
+OK     1 \frac{1}{2}
+OK     2 E = mc^2
+ERR    3 \unknown — Parse error: unknown command \unknown
+
+Rendered 2 formulas to output/
+```
+
+### Batch example
+
+```bash
+# Render all test cases from a text file
+cat tests/golden/test_cases.txt | ./target/release/ratex-render \
+  --font-dir node_modules/katex/dist/fonts \
+  --output-dir tests/golden/output \
+  --dpr 2.0
+```
+
+<Tip>
+  The `RATEX_UNICODE_FONT` environment variable can point to a Unicode-capable TTF file for rendering characters not covered by KaTeX fonts (e.g. symbols from `\char`).
+</Tip>
+
+---
+
+## Canvas dimensions
+
+The output PNG dimensions are computed as:
+
+```
+img_width  = ceil(display_list.width  × font_size × dpr  +  2 × padding × dpr)
+img_height = ceil((display_list.height + display_list.depth) × font_size × dpr  +  2 × padding × dpr)
+```
+
+All dimensions are guaranteed to be at least 1×1 pixel. The background is filled with white (`#ffffff`) before drawing.

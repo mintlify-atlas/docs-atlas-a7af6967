@@ -1,0 +1,162 @@
+---
+title: "Android"
+description: "Render LaTeX math natively on Android using Kotlin, JNI, and Canvas — no WebView required."
+---
+
+## How it works
+
+RaTeX on Android uses JNI to call into the Rust library, then draws the resulting DisplayList directly onto an Android `Canvas` using KaTeX fonts bundled in the AAR.
+
+```
+LaTeX string
+    ↓ RaTeXEngine.parse()    [Kotlin JNI → libratex_ffi.so]
+JSON DisplayList
+    ↓ DisplayList decode      [Kotlin JSON]
+DisplayList
+    ↓ RaTeXRenderer.draw()   [Android Canvas]
+View / Span
+```
+
+**Minimum SDK:** 21 (Android 5.0+). **Target SDK:** 34.
+
+## Installation
+
+<Steps>
+  <Step title="Add the Gradle dependency">
+    In your app's `build.gradle`:
+
+    ```kotlin
+    implementation("io.github.erweixin:ratex-android:0.0.15")
+    ```
+
+    The AAR includes all required KaTeX fonts. No additional font setup is needed.
+  </Step>
+  <Step title="Sync and use">
+    After syncing Gradle, set `latex` and `fontSize` on `RaTeXView`:
+
+    ```kotlin
+    binding.mathView.latex    = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
+    binding.mathView.fontSize = 24f   // dp — no manual density conversion needed
+    ```
+
+    Fonts load automatically on first render. To preload at startup, call:
+
+    ```kotlin
+    RaTeXFontLoader.loadFromAssets(context, "fonts")
+    ```
+  </Step>
+</Steps>
+
+## Usage
+
+<Tabs>
+  <Tab title="Block formula">
+    Declare `RaTeXView` in XML:
+
+    ```xml
+    <io.ratex.RaTeXView android:id="@+id/mathView"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    ```
+
+    Then set the formula in Kotlin:
+
+    ```kotlin
+    binding.mathView.latex    = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
+    binding.mathView.fontSize = 24f   // dp — no manual density conversion needed
+    ```
+  </Tab>
+  <Tab title="Inline formula">
+    `RaTeXSpan` is a `ReplacementSpan` that renders a LaTeX formula inline with surrounding text — baseline-aligned, with line height expanding automatically.
+
+    Rendering is async. Call `RaTeXSpan.create` from a coroutine:
+
+    ```kotlin
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    fun showInlineFormula(textView: TextView) {
+        scope.launch {
+            val span = RaTeXSpan.create(
+                context  = this@MainActivity,
+                latex    = """\frac{1+\sqrt{5}}{2}""",
+                fontSize = 18f   // dp
+            )
+            val ssb = SpannableStringBuilder("黄金比例 φ = ")
+            val start = ssb.length
+            ssb.append("\u200B")
+            ssb.setSpan(span, start, ssb.length, 0)
+            ssb.append(" ≈ 1.618")
+            textView.text = ssb
+        }
+    }
+    ```
+
+    ### `RaTeXSpan.create` parameters
+
+    <ParamField path="context" type="Context" required>
+      Used for asset access during font loading.
+    </ParamField>
+
+    <ParamField path="latex" type="String" required>
+      LaTeX math-mode string. Do not include surrounding `$` or `\[…\]` delimiters.
+    </ParamField>
+
+    <ParamField path="fontSize" type="Float" required>
+      Font size in dp. Converted to px internally.
+    </ParamField>
+
+    <Note>
+      `RaTeXSpan.create` throws `RaTeXException` if the formula cannot be parsed.
+    </Note>
+  </Tab>
+  <Tab title="Low-level">
+    Use `RaTeXEngine` and `RaTeXRenderer` directly for Compose or custom `View` drawing:
+
+    ```kotlin
+    val dl       = RaTeXEngine.parse(latex)
+    val renderer = RaTeXRenderer(dl, fontSize) { RaTeXFontLoader.getTypeface(it) }
+    renderer.draw(canvas)
+    ```
+  </Tab>
+</Tabs>
+
+## Building from source
+
+Use this path when you want to modify the native library or work from the repo directly.
+
+<Steps>
+  <Step title="Install prerequisites">
+    - NDK 26+ (set `ANDROID_NDK_HOME` or install via Android Studio's SDK Manager)
+    - `cargo-ndk`: `cargo install cargo-ndk`
+    - Rust Android targets:
+
+    ```bash
+    rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+    ```
+  </Step>
+  <Step title="Build the native libraries">
+    From the repo root:
+
+    ```bash
+    bash platforms/android/build-android.sh
+    # → src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}/libratex_ffi.so
+    ```
+  </Step>
+  <Step title="Include as a local module">
+    In your `settings.gradle`:
+
+    ```kotlin
+    include(":ratex-android")
+    project(":ratex-android").projectDir = file("path/to/RaTeX/platforms/android")
+    ```
+
+    Then in your app's `build.gradle`:
+
+    ```kotlin
+    implementation(project(":ratex-android"))
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  **Troubleshooting:** `UnsatisfiedLinkError` means the native `.so` was not built — run `build-android.sh`. If NDK is not found, install NDK 26+ or set the `ANDROID_NDK_HOME` environment variable.
+</Note>

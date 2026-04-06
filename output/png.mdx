@@ -1,0 +1,164 @@
+---
+title: PNG rendering
+description: Render LaTeX formulas to PNG files on the server using ratex-render and the tiny-skia rasterizer — no display, no browser, no JavaScript.
+---
+
+`ratex-render` is the server-side rasterizer in the RaTeX workspace. It takes a `DisplayList` produced by the layout engine, replays the drawing commands through [tiny-skia](https://github.com/RazrFalcon/tiny-skia), and writes PNG files to disk. No display server, GPU, or browser is required.
+
+## Prerequisites
+
+You need Rust 1.70 or later. Install via [rustup](https://rustup.rs) if you do not have it already.
+
+```bash
+cargo --version   # should print 1.70.0 or higher
+```
+
+KaTeX TTF font files must be available for the rasterizer to draw glyphs. The binary searches several relative paths automatically (see [font lookup](#font-lookup)), or you can supply `--font-dir` explicitly.
+
+## Building
+
+Clone the repository and build the release binary:
+
+```bash
+git clone https://github.com/erweixin/RaTeX.git
+cd RaTeX
+cargo build --release
+```
+
+The release build places the binary at `target/release/ratex-render`. You can also use `cargo run --release -p ratex-render` without a separate build step.
+
+## Running
+
+The binary reads one LaTeX formula per line from stdin and writes a PNG file for each formula into the output directory (default: `output/`). Lines that are empty or start with `#` are skipped.
+
+### Basic usage
+
+```bash
+echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-render
+```
+
+### Chemistry notation
+
+```bash
+echo '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | cargo run --release -p ratex-render
+```
+
+### Rendering multiple formulas
+
+Pipe a file with one formula per line:
+
+```bash
+cargo run --release -p ratex-render < tests/golden/test_cases.txt
+```
+
+Output files are named sequentially: `0001.png`, `0002.png`, and so on.
+
+## Command-line flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output-dir <path>` | `output` | Directory to write PNG files into. Created if it does not exist. |
+| `--font-dir <path>` | auto-detected | Directory containing KaTeX `.ttf` files. |
+| `--font-size <f32>` | `40.0` | Font size in user units (pixels at DPR 1). |
+| `--dpr <f32>` | `1.0` | Device pixel ratio. Output image dimensions are scaled by this factor. |
+
+## Font lookup
+
+If `--font-dir` is not supplied, the binary searches these paths in order for `KaTeX_Main-Regular.ttf`:
+
+```
+fonts
+../fonts
+../../fonts
+../../../fonts
+tools/lexer_compare/node_modules/katex/dist/fonts
+../tools/lexer_compare/node_modules/katex/dist/fonts
+../../tools/lexer_compare/node_modules/katex/dist/fonts
+```
+
+The easiest way to satisfy the requirement inside the repository is to install the npm `katex` package under `tools/lexer_compare`:
+
+```bash
+cd tools/lexer_compare && npm install
+```
+
+This places the KaTeX fonts at `tools/lexer_compare/node_modules/katex/dist/fonts/`, which is one of the auto-detected paths.
+
+<Note>
+  Without valid KaTeX TTF files, `ratex-render` will still run but glyphs will
+  render as replacement characters. Always verify font lookup succeeds before
+  generating reference or production images.
+</Note>
+
+## What the binary does
+
+The `main.rs` entry point (`crates/ratex-render/src/main.rs`) follows this flow for each input line:
+
+<Steps>
+  <Step title="Parse">
+    Calls `ratex_parser::parser::parse(expr)` to produce a `ParseNode` AST.
+  </Step>
+  <Step title="Layout">
+    Calls `ratex_layout::layout(&ast, &layout_opts)` to produce a `LayoutBox` tree, then `to_display_list(&lbox)` to flatten it into a `DisplayList`.
+  </Step>
+  <Step title="Rasterize">
+    Calls `ratex_render::render_to_png(&display_list, &render_opts)` which replays the drawing commands through tiny-skia and returns raw PNG bytes.
+  </Step>
+  <Step title="Write">
+    Writes the PNG bytes to `{output_dir}/{index:04}.png` and prints a status line to stdout.
+  </Step>
+</Steps>
+
+Errors on individual lines are printed to stderr with `ERR` prefix and do not abort the remaining formulas.
+
+## RenderOptions
+
+The rasterizer is also available as a library function. The options struct mirrors the CLI flags:
+
+```rust
+use ratex_render::{render_to_png, RenderOptions};
+
+let options = RenderOptions {
+    font_size: 40.0,
+    padding: 10.0,
+    font_dir: "/path/to/katex/fonts".to_string(),
+    device_pixel_ratio: 2.0,
+};
+```
+
+## Use cases
+
+<AccordionGroup>
+  <Accordion title="CI and golden tests">
+    The golden test workflow in `crates/ratex-render/tests/golden_test.rs` renders all formulas in `tests/golden/test_cases.txt` and compares them against KaTeX reference PNGs in `tests/golden/fixtures/` using an ink-coverage threshold.
+
+    Regenerate RaTeX outputs with:
+
+    ```bash
+    ./scripts/update_golden_output.sh
+    ```
+  </Accordion>
+
+  <Accordion title="Static site generation">
+    Pipe your site's formula list through `ratex-render` at build time and serve the resulting PNGs as static assets. No client-side JavaScript or font loading required.
+  </Accordion>
+
+  <Accordion title="Server-side rendering">
+    For applications that need math in emails, PDFs, or image exports, call `render_to_png` directly from Rust. The library function is synchronous and thread-safe.
+  </Accordion>
+
+  <Accordion title="Test fixtures for new platforms">
+    When adding a new renderer (a new native platform, a custom canvas, etc.) render the same formula set to PNG with `ratex-render` as a pixel-level reference for visual regression tests.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SVG export" icon="vector-square" href="/output/svg">
+    Produce vector SVG output — with optional embedded glyph outlines for fully self-contained files.
+  </Card>
+  <Card title="DisplayList format" icon="list" href="/guides/display-list">
+    Understand the drawing command format that feeds every renderer including ratex-render.
+  </Card>
+</CardGroup>

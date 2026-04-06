@@ -1,97 +1,80 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "RaTeX — LaTeX Math Rendering in Pure Rust"
+description: "KaTeX-compatible math rendering engine. No JavaScript, no WebView, no DOM. One Rust core renders natively on iOS, Android, Flutter, React Native, Web, and server-side PNG/SVG."
 ---
 
-## Setting up
+RaTeX is a LaTeX math rendering engine written entirely in Rust. It parses LaTeX, computes a layout, and produces a `DisplayList` — a platform-agnostic sequence of drawing commands that each target platform renders natively. No hidden WebView, no JavaScript runtime, no DOM overhead.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Install RaTeX on your platform and render your first formula in minutes.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    Understand the Rust core, DisplayList format, and how platform bindings work.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Platform Guides" icon="mobile" href="/platforms/ios">
+    Detailed integration guides for iOS, Android, Flutter, React Native, and Web.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/c-abi">
+    Full reference for the C ABI, WASM exports, and Rust crate types.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why RaTeX?
 
-Everything you need to create world-class documentation.
+Every major cross-platform math renderer runs LaTeX through a browser or JavaScript engine — a hidden WebView consuming 50–150 MB RAM, startup latency before the first formula, and no offline guarantee.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+RaTeX cuts the web stack out entirely:
 
-## Need inspiration?
+| | KaTeX (web) | MathJax | **RaTeX** |
+|---|---|---|---|
+| Runtime | V8 + DOM | V8 + DOM | **Pure Rust** |
+| Mobile | WebView | WebView | **Native** |
+| Offline | Depends | Depends | **Yes** |
+| Bundle overhead | ~280 kB JS | ~500 kB JS | **0 kB JS** |
+| Memory | GC / heap | GC / heap | **Predictable** |
+| Syntax coverage | 100% | ~100% | **~99%** |
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Supported platforms
+
+<CardGroup cols={3}>
+  <Card title="iOS" icon="apple" href="/platforms/ios">
+    XCFramework + Swift / CoreGraphics. Install via Swift Package Manager.
+  </Card>
+  <Card title="Android" icon="android" href="/platforms/android">
+    JNI + Kotlin + Canvas. Available as an AAR on Maven Central.
+  </Card>
+  <Card title="Flutter" icon="chess-board" href="/platforms/flutter">
+    Dart FFI + CustomPainter. Available on pub.dev.
+  </Card>
+  <Card title="React Native" icon="react" href="/platforms/react-native">
+    Native module with Fabric and Bridge support. Available on npm.
+  </Card>
+  <Card title="Web (WASM)" icon="globe" href="/platforms/web">
+    WASM + Canvas 2D. Drop-in `<ratex-formula>` Web Component.
+  </Card>
+  <Card title="Server / PNG" icon="server" href="/output/png">
+    Render to PNG server-side via tiny-skia. No display required.
+  </Card>
+</CardGroup>
+
+## Get started
+
+<Steps>
+  <Step title="Choose your platform">
+    Pick the integration guide for your target platform — iOS, Android, Flutter, React Native, or Web.
+  </Step>
+  <Step title="Install the package">
+    Each platform has a published package. No native build required for most platforms.
+  </Step>
+  <Step title="Render a formula">
+    Pass a LaTeX string to the platform widget or API. RaTeX handles parsing, layout, and drawing.
+  </Step>
+  <Step title="Explore advanced features">
+    Use chemistry notation (`\ce`, `\pu`), SVG export, or the low-level DisplayList API for custom rendering.
+  </Step>
+</Steps>
+
+<Note>
+  RaTeX targets ~99% KaTeX syntax coverage. For the rare edge cases, see the [LaTeX syntax guide](/guides/latex-syntax) and the [live support table](https://erweixin.github.io/RaTeX/demo/support-table.html).
+</Note>
